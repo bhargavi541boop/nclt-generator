@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NCLT Document Generator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.5/dist/pizzip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.1/docxtemplater.js"></script>
+
+  <style>
+    :root {
+      --navy: #1a3a5c;
+      --navy-dk: #0f2740;
+      --gold: #c9a84c;
+      --gold-lt: #e8d49a;
+      --cream: #f9f7f2;
+      --cream-2: #faf8f2;
+      --cream-3: #fffdf5;
+      --border: #ddd8c8;
+      --border-md: #ccc6b4;
+      --muted: #7a6e58;
+      --muted-lt: #9a8e75;
+      --text: #1a3a5c;
+      --warn-bg: #fef6e6;
+      --warn-border: #d4900a;
+      --warn-text: #7a4a00;
+      --font-display: 'Cormorant Garamond', Georgia, serif;
+      --font-body: 'Inter', system-ui, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f0ede6; font-family: var(--font-body); font-size: 13px; color: var(--text); min-height: 100vh; }
+
+    /* HEADER */
+    .header {
+      background: var(--navy);
+      border-bottom: 3px solid var(--gold);
+      padding: 13px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-eyebrow { font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--gold-lt); font-weight: 500; display: block; }
+    .header-title { font-family: var(--font-display); font-size: 21px; color: white; font-weight: 400; line-height: 1; }
+    .header-title strong { font-weight: 600; }
+    .header-actions { display: flex; gap: 8px; }
+    .btn-header {
+      background: transparent;
+      border: 1px solid rgba(232,212,154,0.55);
+      color: var(--gold-lt);
+      padding: 5px 14px;
+      border-radius: 4px;
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s, color 0.18s;
+    }
+    .btn-header:hover { background: var(--gold); border-color: var(--gold); color: var(--navy); }
+
+    /* WIZARD SHELL */
+    .wizard-shell {
+      max-width: 860px;
+      margin: 28px auto 60px;
+      padding: 0 16px;
+    }
+    .wizard-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* STEP BAR */
+    .step-bar { display: flex; background: var(--cream); border-bottom: 1px solid var(--border); }
+    .step-tab {
+      flex: 1;
+      padding: 11px 4px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted-lt);
+      border-bottom: 2px solid transparent;
+      letter-spacing: 0.3px;
+      cursor: default;
+      user-select: none;
+    }
+    .step-tab.active { color: var(--navy); border-bottom: 2px solid var(--gold); background: white; }
+    .step-tab.done { color: #3a6b20; cursor: pointer; }
+    .step-tab.done:hover { background: #f4faf0; }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 17px; height: 17px;
+      border-radius: 50%;
+      background: #e0dac8;
+      color: var(--muted);
+      font-size: 10px;
+      margin-right: 5px;
+    }
+    .step-tab.active .step-num { background: var(--gold); color: white; }
+    .step-tab.done .step-num { background: #639922; color: white; }
+
+    /* PROGRESS BAR */
+    .progress-bar { height: 3px; background: var(--border); }
+    .progress-fill { height: 100%; background: var(--gold); border-radius: 2px; transition: width 0.4s ease; }
+
+    /* STEP BODY */
+    .step-body { padding: 20px; display: none; }
+    .step-body.active { display: block; }
+
+    /* SECTION TITLE */
+    .sec-title {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--navy);
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* GRID */
+    .row { display: grid; gap: 10px; margin-bottom: 10px; }
+    .row:last-child { margin-bottom: 0; }
+    .col-1 { grid-template-columns: 1fr; }
+    .col-2 { grid-template-columns: 1fr 1fr; }
+    .col-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .col-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+    /* FORM ELEMENTS */
+    label.field-label {
+      display: block;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    input.field, select.field {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 7px 10px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--navy);
+      background: var(--cream-2);
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    select.field {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a6e58'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+    textarea.field {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 7px 10px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--navy);
+      background: var(--cream-2);
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+      resize: vertical;
+      min-height: 60px;
+      line-height: 1.5;
+    }
+    input.field:focus, select.field:focus, textarea.field:focus { border-color: var(--gold); background: var(--cream-3); }
+
+    /* PARTY CARDS */
+    .party-card {
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--gold);
+      border-radius: 0 4px 4px 0;
+      background: var(--cream-3);
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+    .party-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .party-label { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+
+    .btn-remove {
+      background: white;
+      border: 1px solid #ddd8c8;
+      color: var(--muted);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .btn-remove:hover { border-color: #c0392b; color: #c0392b; background: #fff5f5; }
+
+    .btn-add {
+      background: white;
+      border: 1px solid var(--border-md);
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .btn-add:hover { border-color: var(--gold); color: var(--navy); background: var(--cream-3); }
+
+    .btn-secondary {
+      background: white;
+      border: 1px solid var(--border-md);
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .btn-secondary:hover { background: var(--cream-2); color: var(--navy); border-color: var(--border-md); }
+
+    .btn-navy {
+      background: white;
+      border: 1.5px solid var(--navy);
+      color: var(--navy);
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+    }
+    .btn-navy:hover { background: var(--navy); color: white; }
+
+    /* NAV ROW */
+    .nav-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--cream);
+    }
+    .nav-step-label { font-size: 12px; color: var(--muted-lt); }
+    .btn-nav-back {
+      background: white;
+      border: 1px solid var(--border-md);
+      color: var(--muted);
+      padding: 7px 20px;
+      border-radius: 4px;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-nav-back:hover { border-color: var(--navy); color: var(--navy); }
+    .btn-nav-next {
+      background: var(--navy);
+      border: none;
+      color: white;
+      padding: 7px 22px;
+      border-radius: 4px;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.18s;
+    }
+    .btn-nav-next:hover { background: var(--navy-dk); }
+
+    /* APPLICATION BADGE */
+    .app-badge {
+      font-size: 9px;
+      color: var(--gold);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border: 1px solid rgba(201,168,76,0.4);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    /* DIVIDER */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+    /* VAKALATNAMA */
+    .vak-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--cream-2);
+      font-size: 13px;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .vak-item input[type="checkbox"] { accent-color: var(--gold); width: 14px; height: 14px; cursor: pointer; }
+    .vak-empty { font-size: 12px; color: var(--muted-lt); }
+
+    /* APPLICATION BLOCK */
+    #applicationBlock { display: none; }
+    .app-inner { background: var(--cream); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-top: 10px; }
+    .app-inner-title {
+      font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ADVOCATE SAVED MSG */
+    #advocateSavedMsg { font-size: 12px; color: var(--muted); display: none; }
+
+    /* WARNING BANNER */
+    .warn-banner {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--warn-text);
+      margin-bottom: 16px;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .warn-banner.visible { display: flex; }
+    .btn-warn-go {
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.18s;
+    }
+    .btn-warn-go:hover { background: var(--navy-dk); }
+
+    /* GENERATE SECTION */
+    .gen-main-btn {
+      width: 100%;
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 13px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: background 0.18s;
+    }
+    .gen-main-btn:hover { background: var(--navy-dk); }
+    .gen-main-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .gen-group { margin-bottom: 18px; }
+    .gen-group-header {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .gen-group-line { flex: 1; height: 1px; background: var(--border); }
+    .gen-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .gen-card {
+      background: white;
+      border: 1px solid var(--border-md);
+      border-radius: 6px;
+      padding: 11px 13px;
+      cursor: pointer;
+      text-align: left;
+      font-family: var(--font-body);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .gen-card:hover { border-color: var(--gold); background: var(--cream-3); }
+    .gen-card-name { font-size: 12px; font-weight: 600; color: var(--navy); }
+    .gen-card-desc { font-size: 11px; color: var(--muted-lt); margin-top: 3px; }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15,39,64,0.45);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: white;
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--gold);
+      border-radius: 6px;
+      padding: 24px 28px;
+      width: 420px;
+      max-width: 90vw;
+    }
+    .modal-title { font-size: 9px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--navy); margin-bottom: 6px; }
+    .modal-desc { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-btn-cancel {
+      background: white; border: 1px solid var(--border); color: var(--muted);
+      padding: 7px 16px; border-radius: 4px; font-family: var(--font-body);
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: border-color 0.15s;
+    }
+    .modal-btn-cancel:hover { border-color: var(--navy); color: var(--navy); }
+    .modal-btn-confirm {
+      background: var(--navy); border: none; color: white;
+      padding: 7px 20px; border-radius: 4px; font-family: var(--font-body);
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.18s;
+    }
+    .modal-btn-confirm:hover { background: var(--navy-dk); }
+
+    .party-check-list {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 8px 24px; margin: 12px 0 20px;
+    }
+    .party-check-list label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--navy); cursor: pointer;
+      padding: 6px 8px; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--cream-2);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .party-check-list label:hover { border-color: var(--gold); background: var(--cream-3); }
+    .party-check-list input[type="checkbox"] { accent-color: var(--gold); width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
+
+    /* HELPER CLASSES */
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .app-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .advocate-btn-row { display: flex; justify-content: flex-end; gap: 8px; align-items: center; margin-top: 6px; }
+
+    /* SAVE STATUS */
+    .save-status {
+      font-size: 10px;
+      color: var(--gold-lt);
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .save-status.visible { opacity: 1; }
+
+    /* CASE LIST MODAL */
+    .case-list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-bottom: 6px;
+      background: var(--cream-2);
+      transition: border-color 0.15s;
+    }
+    .case-list-item:hover { border-color: var(--gold); }
+    .case-list-name { font-size: 13px; font-weight: 600; color: var(--navy); }
+    .case-list-date { font-size: 11px; color: var(--muted-lt); margin-top: 2px; }
+    .case-list-actions { display: flex; gap: 6px; }
+    .case-list-empty { font-size: 13px; color: var(--muted-lt); text-align: center; padding: 20px; }
+
+    /* ADVOCATE SAVED MSG */
+    #advocateSavedMsg { font-size: 12px; color: var(--muted); display: none; }
+
+    /* RESPONSIVE */
+    @media (max-width: 600px) {
+      .header { flex-direction: column; gap: 8px; padding: 10px 12px; text-align: center; }
+      .header-eyebrow { font-size: 8px; }
+      .header-title { font-size: 15px; }
+      .header-right { flex-direction: column; gap: 6px; }
+      .header-actions { flex-wrap: wrap; justify-content: center; gap: 6px; }
+      .step-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .step-tab { min-width: 0; padding: 10px 8px; font-size: 10px; white-space: nowrap; }
+      .step-num { width: 15px; height: 15px; font-size: 9px; }
+      .col-2, .col-3, .col-4 { grid-template-columns: 1fr; }
+      .gen-grid { grid-template-columns: 1fr; }
+      .party-check-list { grid-template-columns: 1fr; }
+      input.field, select.field, textarea.field { font-size: 16px; padding: 10px 12px; }
+      .btn-remove, .btn-add, .btn-secondary, .btn-navy, .btn-header { padding: 10px 14px; font-size: 12px; min-height: 44px; }
+      .btn-nav-back, .btn-nav-next { padding: 12px 20px; font-size: 13px; min-height: 44px; }
+      .nav-row { padding: 10px 12px; }
+      .modal-box { width: 100%; max-width: calc(100vw - 24px); padding: 18px 16px; margin: 12px; }
+      .wizard-shell { margin: 12px auto 40px; padding: 0 8px; }
+      .party-card { padding: 14px 12px; }
+      label.field-label { font-size: 10px; margin-bottom: 5px; }
+      .advocate-btn-row { flex-direction: column; align-items: stretch; }
+      .advocate-btn-row .btn-secondary, .advocate-btn-row .btn-navy { width: 100%; text-align: center; }
+      .step-body { padding: 14px 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <span class="header-eyebrow">National Company Law Tribunal</span>
+      <span class="header-title">Document <strong>Generator</strong></span>
+    </div>
+    <div class="header-right">
+      <span class="save-status" id="saveStatus"></span>
+      <div class="header-actions">
+        <button class="btn-header" onclick="saveCase()">Save Case</button>
+        <button class="btn-header" onclick="loadCase()">Load Case</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIZARD -->
+  <div class="wizard-shell">
+    <div class="wizard-card">
+
+      <!-- STEP BAR -->
+      <div class="step-bar">
+        <div class="step-tab active" id="tab-1" onclick="goToStep(1)"><span class="step-num">1</span>Case</div>
+        <div class="step-tab" id="tab-2" onclick="goToStep(2)"><span class="step-num">2</span>Parties</div>
+        <div class="step-tab" id="tab-3" onclick="goToStep(3)"><span class="step-num">3</span>Advocate</div>
+        <div class="step-tab" id="tab-4" onclick="goToStep(4)"><span class="step-num">4</span>Generate</div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:25%"></div></div>
+
+      <!-- ═══ STEP 1: CASE DETAILS ═══ -->
+      <div class="step-body active" id="step-1">
+        <div class="sec-title">Case details</div>
+        <div class="row col-3">
+          <div>
+            <label class="field-label">Bench</label>
+            <select id="bench" class="field"></select>
+          </div>
+          <div>
+            <label class="field-label">Bench No</label>
+            <input id="benchNo" class="field" placeholder="e.g. I">
+          </div>
+          <div>
+            <label class="field-label">Case Type</label>
+            <select id="caseType" class="field" onchange="onCaseTypeChange()"></select>
+          </div>
+        </div>
+        <div class="row col-2">
+          <div>
+            <label class="field-label">Petition No</label>
+            <input id="petitionNo" class="field" placeholder="e.g. 324">
+          </div>
+          <div>
+            <label class="field-label">Petition Year</label>
+            <input id="petitionYear" class="field" placeholder="e.g. 2024">
+          </div>
+        </div>
+        <div class="row col-1">
+          <div>
+            <label class="field-label">Legal Citation (Section r/w Rule)</label>
+            <input id="citation" class="field" placeholder="e.g. Section 230 r/w Rule 3">
+          </div>
+        </div>
+
+        <!-- APPLICATION DETAILS -->
+        <div id="applicationBlock">
+          <div class="divider"></div>
+          <div class="app-section-header">
+            <span class="sec-title" style="margin-bottom:0;border-bottom:none;padding-bottom:0;">Application details</span>
+            <span class="app-badge">Applications only</span>
+          </div>
+          <div class="app-inner">
+            <div class="row col-2">
+              <div>
+                <label class="field-label">Application No</label>
+                <input id="applicationNo" class="field" placeholder="e.g. 42">
+              </div>
+              <div>
+                <label class="field-label">Application Year</label>
+                <input id="applicationYear" class="field" placeholder="e.g. 2024">
+              </div>
+            </div>
+            <div class="row col-2">
+              <div>
+                <label class="field-label">Applicant Name</label>
+                <input id="applicant" class="field" placeholder="Name of applicant" oninput="updateVakalatnama()">
+              </div>
+              <div>
+                <label class="field-label">Applicant Address</label>
+                <textarea id="applicantAddress" class="field" placeholder="Registered address" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="row col-2">
+              <div>
+                <label class="field-label">App. Respondent Name</label>
+                <input id="appRespondent" class="field" placeholder="Name of respondent" oninput="updateVakalatnama()">
+              </div>
+              <div>
+                <label class="field-label">App. Respondent Address</label>
+                <textarea id="appRespondentAddress" class="field" placeholder="Registered address" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ STEP 2: PARTIES ═══ -->
+      <div class="step-body" id="step-2">
+        <div class="sec-title">Petitioners</div>
+        <div id="petitioners"></div>
+        <button class="btn-add" onclick="addParty('petitioners','Petitioner')">+ Add Petitioner</button>
+
+        <div class="divider"></div>
+
+        <div class="sec-title">Respondents</div>
+        <div id="respondents"></div>
+        <button class="btn-add" onclick="addParty('respondents','Respondent')">+ Add Respondent</button>
+      </div>
+
+      <!-- ═══ STEP 3: ADVOCATE + VAKALATNAMA ═══ -->
+      <div class="step-body" id="step-3">
+        <div class="sec-title">Advocate details</div>
+        <div class="row col-4">
+          <div>
+            <label class="field-label">Saved Advocates</label>
+            <select id="advocateDropdown" class="field" onchange="onAdvocateSelect()">
+              <option value="">— Select saved —</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Name</label>
+            <input id="advocateName" class="field" placeholder="Full name">
+          </div>
+          <div>
+            <label class="field-label">Address</label>
+            <textarea id="advocateAddress" class="field" placeholder="Chamber / office address" rows="2"></textarea>
+          </div>
+          <div>
+            <label class="field-label">Representing</label>
+            <select id="advocateSide" class="field">
+              <option value="">— Select —</option>
+              <option value="Petitioner">Petitioner</option>
+              <option value="Respondent">Respondent</option>
+              <option value="Applicant">Applicant</option>
+            </select>
+          </div>
+        </div>
+        <div class="advocate-btn-row">
+          <span id="advocateSavedMsg"></span>
+          <button class="btn-secondary" onclick="removeAdvocate()">Remove Advocate</button>
+          <button class="btn-navy" onclick="saveAdvocate()">Save Advocate</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="sec-title">Vakalatnama</div>
+        <p style="font-size:12px;color:var(--muted-lt);margin-bottom:10px;">Select which parties will be named as deponents in this vakalatnama. Unchecked parties are excluded from the deponent line only — they still appear in the case caption.</p>
+        <div id="vakalatnamaParties">
+          <span class="vak-empty">Add parties in Step 2 to see options here.</span>
+        </div>
+      </div>
+
+      <!-- ═══ STEP 4: GENERATE ═══ -->
+      <div class="step-body" id="step-4">
+        <div class="warn-banner" id="warnBanner">
+          <span id="warnText">Some fields are empty — documents may have gaps.</span>
+          <button class="btn-warn-go" onclick="dismissWarn()">Generate anyway</button>
+        </div>
+
+        <button class="gen-main-btn" id="genMainBtn" onclick="generateFolder()">
+          ↓ &nbsp;Create Other Pages
+        </button>
+
+        <div class="gen-group">
+          <div class="gen-group-header">Petition documents <div class="gen-group-line"></div></div>
+          <div class="gen-grid">
+            <button class="gen-card" onclick="openModal('Written Submissions','A formal written argument filed before the Tribunal summarising your legal position.')">
+              <div class="gen-card-name">Written Submissions</div>
+              <div class="gen-card-desc">Formal written argument</div>
+            </button>
+            <button class="gen-card" onclick="openModal('Affidavit of Service','An affidavit confirming that notice or documents have been duly served on the other parties.')">
+              <div class="gen-card-name">Affidavit of Service</div>
+              <div class="gen-card-desc">Confirms service on parties</div>
+            </button>
+            <button class="gen-card" onclick="openModal('Additional Documents','Additional documents to be filed along with the petition or application.')">
+              <div class="gen-card-name">Additional Documents</div>
+              <div class="gen-card-desc">Supporting annexures</div>
+            </button>
+          </div>
+        </div>
+
+        <div class="gen-group">
+          <div class="gen-group-header">Party-specific <div class="gen-group-line"></div></div>
+          <div class="gen-grid">
+            <button class="gen-card" onclick="openPartySelector('Rejoinder')">
+              <div class="gen-card-name">Rejoinder</div>
+              <div class="gen-card-desc">Select parties on click</div>
+            </button>
+            <button class="gen-card" onclick="openPartySelector('Reply')">
+              <div class="gen-card-name">Reply</div>
+              <div class="gen-card-desc">Select parties on click</div>
+            </button>
+            <button class="gen-card" onclick="openPartySelector('Additional Affidavit')">
+              <div class="gen-card-name">Additional Affidavit</div>
+              <div class="gen-card-desc">Select parties on click</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- NAV ROW -->
+      <div class="nav-row" id="navRow">
+        <button class="btn-nav-back" id="btnBack" onclick="changeStep(-1)" style="visibility:hidden">← Back</button>
+        <span class="nav-step-label" id="navStepLabel">Step 1 of 4</span>
+        <button class="btn-nav-next" id="btnNext" onclick="changeStep(1)">Next →</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DOWNLOAD MODAL -->
+  <div class="modal-overlay" id="docModal">
+    <div class="modal-box">
+      <div class="modal-title" id="modalTitle">Document</div>
+      <div class="modal-desc" id="modalDesc">Generate and download this document.</div>
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="modal-btn-confirm" onclick="downloadDoc()">Download</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTY SELECTOR MODAL -->
+  <div class="modal-overlay" id="partyModal">
+    <div class="modal-box">
+      <div class="modal-title">Select Parties</div>
+      <div id="partySelectionList"></div>
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" onclick="closePartyModal()">Cancel</button>
+        <button class="modal-btn-confirm" onclick="confirmPartySelection()">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVE CASE MODAL -->
+  <div class="modal-overlay" id="saveCaseModal">
+    <div class="modal-box">
+      <div class="modal-title">Save Case</div>
+      <div class="modal-desc">Enter a name for this case. Re-saving with the same name will overwrite the previous save.</div>
+      <div style="margin-bottom:16px;">
+        <label class="field-label">Case Name</label>
+        <input id="saveCaseNameInput" class="field" placeholder="e.g. Tata v Mistry 2024" onkeydown="if(event.key==='Enter') confirmSaveCase()">
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" onclick="closeSaveCaseModal()">Cancel</button>
+        <button class="modal-btn-confirm" id="saveCaseConfirmBtn" onclick="confirmSaveCase()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOAD CASE MODAL -->
+  <div class="modal-overlay" id="loadCaseModal">
+    <div class="modal-box" style="width:520px;">
+      <div class="modal-title">Load Case</div>
+      <div id="loadCaseList" style="max-height:350px;overflow-y:auto;margin-bottom:16px;"></div>
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" onclick="closeLoadCaseModal()">Close</button>
+      </div>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
